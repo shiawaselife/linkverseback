@@ -14,32 +14,23 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Table("users")
-public class User {
-
+@Table("posts")
+public class Post {
+    
     @Id
     private Long id;
-
-    private String email;
-    private String password;
-    private String username;
-
-    private String profileName;
-
-    @Column("profile_image")
-    private String profileImage;
-
-    private String bio;
-
-    @Column("profile_visibility")
-    private String profileVisibility;
-
-    @Column("email_verified")
-    private Boolean emailVerified;
-
+    
+    @Column("user_id")
+    private Long userId;
+    
+    private String content;
+    private String location;
+    private String visibility;
+    private String image;
+    
     @Column("created_at")
     private LocalDateTime createdAt;
-
+    
     @Column("updated_at")
     private LocalDateTime updatedAt;
 }

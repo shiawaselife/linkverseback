@@ -36,6 +36,8 @@ dependencies {
     testImplementation 'io.projectreactor:reactor-test'
     testImplementation 'org.springframework.security:spring-security-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    implementation 'io.netty:netty-resolver-dns-native-macos:4.1.118.Final:osx-aarch_64'
 }
 
 
