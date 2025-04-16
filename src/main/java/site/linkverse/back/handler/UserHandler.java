@@ -1,130 +1,128 @@
 package site.linkverse.back.handler;
 
-
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
-import site.linkverse.back.dto.AuthRequest;
-import site.linkverse.back.dto.UserDto;
+import site.linkverse.back.dto.*;
 import site.linkverse.back.service.UserService;
 
-import java.util.HashMap;
-import java.util.Objects;
-
-import static org.springframework.http.MediaType.APPLICATION_JSON;
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
 public class UserHandler {
-
     private final UserService userService;
-
-    /**
-     * 새 사용자 등록 처리
-     */
+    
     public Mono<ServerResponse> register(ServerRequest request) {
-        // 요청 본문에서 UserDto 객체로 변환
-        return request.bodyToMono(UserDto.class)
-                .flatMap(userDto -> userService.registerUser(userDto))
-                .flatMap(savedUser -> ServerResponse.ok()
-                        .contentType(APPLICATION_JSON)
-                        .bodyValue(savedUser));
+        return request.bodyToMono(UserRegistrationDto.class)
+            .flatMap(userService::registerUser)
+            .flatMap(userDto -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).bodyValue(
+                ApiResponse.<UserDto>builder()
+                    .success(true)
+                    .message("회원가입이 완료되었습니다")
+                    .data(userDto)
+                    .build()
+            ))
+            .onErrorResume(e -> ServerResponse.badRequest().bodyValue(
+                ApiResponse.builder()
+                    .success(false)
+                    .message(e.getMessage())
+                    .build()
+            ));
     }
-
-    /**
-     * 로그인 처리 및 JWT 토큰 발급
-     */
+    
     public Mono<ServerResponse> login(ServerRequest request) {
-        return request.bodyToMono(AuthRequest.class)
-                .flatMap(authRequest -> userService.findByUsername(authRequest.getUsername())
-                        .filter(user -> user.getPassword().equals(authRequest.getPassword()))
-                        .flatMap(user -> {
-                            var responseData = new HashMap<String, Object>();
-                            responseData.put("username", user.getUsername());
-                            responseData.put("success", true);
-
-                            return ServerResponse.ok().contentType(APPLICATION_JSON).bodyValue(responseData);
-                        })
-                        .switchIfEmpty(Mono.defer(() -> {
-                            var failResponse = new HashMap<String, Object>();
-                            failResponse.put("success", false);
-
-                            return ServerResponse.ok()
-                                .contentType(APPLICATION_JSON)
-                                .bodyValue(failResponse);
-                        }))
-                );
-
-
-        /*
-        return request.bodyToMono(AuthRequest.class)
-                .flatMap(authRequest -> userService.findByEmail(authRequest.getEmail())
-                        .filter(user -> passwordEncoder.matches(authRequest.getPassword(), user.getPassword()))
-                        .flatMap(user -> {
-                            // JWT 토큰 생성
-                            String token = jwtService.generateToken(user.getEmail());
-                            
-                            // 응답 데이터 구성
-                            var responseData = new HashMap<String, Object>();
-                            responseData.put("token", token);
-                            responseData.put("userId", user.getId());
-                            
-                            return ServerResponse.ok()
-                                    .contentType(APPLICATION_JSON)
-                                    .bodyValue(responseData);
-                        })
-                        .switchIfEmpty(ServerResponse.status(401).build()));
-
-                 */
+        return request.bodyToMono(UserLoginDto.class)
+            .flatMap(userService::login)
+            .flatMap(authResponse -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).bodyValue(
+                ApiResponse.<AuthResponse>builder()
+                    .success(true)
+                    .message("로그인이 완료되었습니다")
+                    .data(authResponse)
+                    .build()
+            ))
+            .onErrorResume(e -> ServerResponse.badRequest().bodyValue(
+                ApiResponse.builder()
+                    .success(false)
+                    .message(e.getMessage())
+                    .build()
+            ));
     }
-
-    /**
-     * 사용자 프로필 조회
-     */
-    public Mono<ServerResponse> getUserProfile(ServerRequest request) {
-        // 경로 변수에서 사용자 ID 추출
-        Long userId = Long.valueOf(request.pathVariable("id"));
+    
+    public Mono<ServerResponse> getUserInfo(ServerRequest request) {
+        Long userId = Long.parseLong(request.pathVariable("id"));
         
-        return userService.findById(userId)
-                .flatMap(user -> ServerResponse.ok()
-                        .contentType(APPLICATION_JSON)
-                        .bodyValue(user))
-                .switchIfEmpty(ServerResponse.notFound().build());
+        return userService.getUserById(userId)
+            .flatMap(userDto -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).bodyValue(
+                ApiResponse.<UserDto>builder()
+                    .success(true)
+                    .data(userDto)
+                    .build()
+            ))
+            .onErrorResume(e -> ServerResponse.badRequest().bodyValue(
+                ApiResponse.builder()
+                    .success(false)
+                    .message(e.getMessage())
+                    .build()
+            ));
     }
-
-    /**
-     * 사용자 프로필 업데이트
-     */
-    public Mono<ServerResponse> updateProfile(ServerRequest request) {
-        // 현재 인증된 사용자 이메일 가져오기
-        String email = request.attribute("email")
-                .map(Object::toString)
-                .orElse("");
+    
+    public Mono<ServerResponse> updateUser(ServerRequest request) {
+        Long userId = Long.parseLong(request.pathVariable("id"));
         
-        return request.bodyToMono(UserDto.class)
-                .flatMap(userDto -> userService.findByEmail(email)
-                        .flatMap(user -> userService.updateUser(user.getId(), userDto)))
-                .flatMap(updatedUser -> ServerResponse.ok()
-                        .contentType(APPLICATION_JSON)
-                        .bodyValue(updatedUser))
-                .switchIfEmpty(ServerResponse.status(401).build());
+        return request.bodyToMono(UserUpdateDto.class)
+            .flatMap(userUpdateDto -> userService.updateUser(userId, userUpdateDto))
+            .flatMap(userDto -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).bodyValue(
+                ApiResponse.<UserDto>builder()
+                    .success(true)
+                    .message("사용자 정보가 업데이트되었습니다")
+                    .data(userDto)
+                    .build()
+            ))
+            .onErrorResume(e -> ServerResponse.badRequest().bodyValue(
+                ApiResponse.builder()
+                    .success(false)
+                    .message(e.getMessage())
+                    .build()
+            ));
     }
-
-    /**
-     * 이메일 인증 완료 처리
-     */
-    /*
-    public Mono<ServerResponse> verifyEmail(ServerRequest request) {
-        String token = request.pathVariable("token");
-        // 실제 구현에서는 토큰을 검증하고 해당 이메일을 추출
-        String email = jwtService.extractEmailFromVerificationToken(token);
+    
+    public Mono<ServerResponse> updatePassword(ServerRequest request) {
+        Long userId = Long.parseLong(request.pathVariable("id"));
         
-        return userService.verifyEmail(email)
-                .then(ServerResponse.ok().build());
+        return request.bodyToMono(PasswordUpdateDto.class)
+            .flatMap(passwordUpdateDto -> userService.updatePassword(userId, passwordUpdateDto))
+            .then(ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).bodyValue(
+                ApiResponse.builder()
+                    .success(true)
+                    .message("비밀번호가 변경되었습니다")
+                    .build()
+            ))
+            .onErrorResume(e -> ServerResponse.badRequest().bodyValue(
+                ApiResponse.builder()
+                    .success(false)
+                    .message(e.getMessage())
+                    .build()
+            ));
     }
-
-     */
+    
+    public Mono<ServerResponse> searchUsers(ServerRequest request) {
+        String keyword = request.queryParam("keyword").orElse("");
+        int page = Integer.parseInt(request.queryParam("page").orElse("0"));
+        int size = Integer.parseInt(request.queryParam("size").orElse("20"));
+        
+        return userService.searchUsers(keyword, page, size)
+            .collectList()
+            .flatMap(users -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).bodyValue(
+                ApiResponse.<List<UserDto>>builder()
+                    .success(true)
+                    .data(users)
+                    .page(page)
+                    .size(size)
+                    .build()
+            ));
+    }
 }

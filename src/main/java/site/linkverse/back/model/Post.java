@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
+import site.linkverse.back.enums.VisibilityType;
 
 import java.time.LocalDateTime;
 
@@ -16,21 +17,20 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Table("posts")
 public class Post {
-    
     @Id
     private Long id;
-    
     @Column("user_id")
     private Long userId;
-    
+    @Column("content")
     private String content;
+    @Column("location")
     private String location;
-    private String visibility;
-    private String image;
-    
+    @Column("visibility")
+    private VisibilityType visibility;
     @Column("created_at")
     private LocalDateTime createdAt;
-    
     @Column("updated_at")
     private LocalDateTime updatedAt;
+    @Column("is_deleted")
+    private boolean isDeleted;
 }

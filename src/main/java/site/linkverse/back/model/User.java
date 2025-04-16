@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
+import site.linkverse.back.enums.VisibilityType;
 
 import java.time.LocalDateTime;
 
@@ -16,30 +17,28 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Table("users")
 public class User {
-
     @Id
     private Long id;
-
+    @Column("email")
     private String email;
+    @Column("password")
     private String password;
+    @Column("username")
     private String username;
-
-    private String profileName;
-
     @Column("profile_image")
     private String profileImage;
-
+    @Column("bio")
     private String bio;
-
     @Column("profile_visibility")
-    private String profileVisibility;
-
-    @Column("email_verified")
-    private Boolean emailVerified;
-
+    private VisibilityType profileVisibility;
     @Column("created_at")
     private LocalDateTime createdAt;
-
     @Column("updated_at")
     private LocalDateTime updatedAt;
+    @Column("last_login_at")
+    private LocalDateTime lastLoginAt;
+    @Column("email_verified")
+    private boolean emailVerified;
+    @Column("notification_settings")
+    private String notificationSettings; // JSON 형태로 저장
 }
