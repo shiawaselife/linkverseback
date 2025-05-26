@@ -66,7 +66,6 @@ public class RouterConfig {
                 .andRoute(POST("/api/follow/{followingId}").and(accept(MediaType.APPLICATION_JSON)), followHandler::toggleFollow)
                 .andRoute(POST("/api/messages").and(accept(MediaType.APPLICATION_JSON)), messageHandler::sendMessage)
                 .andRoute(GET("/api/messages/users/{otherUserId}").and(accept(MediaType.APPLICATION_JSON)), messageHandler::getConversation)
-                .andRoute(GET("/api/messages/groups/{groupId}").and(accept(MediaType.APPLICATION_JSON)), messageHandler::getGroupMessages)
                 .andRoute(GET("/api/messages/recent").and(accept(MediaType.APPLICATION_JSON)), messageHandler::getRecentConversations)
                 .andRoute(PUT("/api/messages/read").and(accept(MediaType.APPLICATION_JSON)), messageHandler::markAsRead)
                 .andRoute(GET("/api/notifications").and(accept(MediaType.APPLICATION_JSON)), notificationHandler::getUserNotifications)
@@ -76,7 +75,10 @@ public class RouterConfig {
                 .andRoute(POST("/api/security/block").and(accept(MediaType.APPLICATION_JSON)), securityHandler::blockUser)
                 .andRoute(DELETE("/api/security/block/{blockedId}").and(accept(MediaType.APPLICATION_JSON)), securityHandler::unblockUser)
                 .andRoute(GET("/api/security/blocked").and(accept(MediaType.APPLICATION_JSON)), securityHandler::getBlockedUsers)
-                .andRoute(POST("/api/security/report").and(accept(MediaType.APPLICATION_JSON)), securityHandler::reportContent);
+                .andRoute(POST("/api/security/report").and(accept(MediaType.APPLICATION_JSON)), securityHandler::reportContent)
+                .andRoute(GET("/api/messages/online-users").and(accept(MediaType.APPLICATION_JSON)), messageHandler::getOnlineUsers)
+                .andRoute(GET("/api/messages/users/{userId}/online-status").and(accept(MediaType.APPLICATION_JSON)), messageHandler::checkUserOnlineStatus);
+
 
         RouterFunction<ServerResponse> mediaRoutes = RouterFunctions
                 .route(POST("/api/media/upload"), mediaHandler::uploadFile)
