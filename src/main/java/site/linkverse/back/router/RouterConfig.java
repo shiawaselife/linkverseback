@@ -26,6 +26,7 @@ public class RouterConfig {
             NotificationHandler notificationHandler,
             SearchHandler searchHandler,
             SecurityHandler securityHandler,
+            MediaHandler mediaHandler,
             AuthenticationFilter authFilter) {
 
         // 인증이 필요 없는 공개 라우트
@@ -77,7 +78,12 @@ public class RouterConfig {
                 .andRoute(GET("/api/security/blocked").and(accept(MediaType.APPLICATION_JSON)), securityHandler::getBlockedUsers)
                 .andRoute(POST("/api/security/report").and(accept(MediaType.APPLICATION_JSON)), securityHandler::reportContent);
 
+        RouterFunction<ServerResponse> mediaRoutes = RouterFunctions
+                .route(POST("/api/media/upload"), mediaHandler::uploadFile)
+                .andRoute(GET("/api/media/" +
+                        "{filename}"), mediaHandler::downloadFile);
+
         // 보호된 라우트에 인증 필터를 적용하고 공개 라우트와 결합
-        return publicRoutes.and(protectedRoutes.filter(authFilter));
+        return publicRoutes.and(protectedRoutes.filter(authFilter)).and(mediaRoutes);
     }
 }
