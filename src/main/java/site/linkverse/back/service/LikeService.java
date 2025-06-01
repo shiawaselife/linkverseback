@@ -8,6 +8,7 @@ import reactor.core.publisher.Mono;
 import site.linkverse.back.dto.LikeDto;
 import site.linkverse.back.dto.UserDto;
 import site.linkverse.back.enums.LikeTargetType;
+import site.linkverse.back.enums.NotificationType;
 import site.linkverse.back.model.Like;
 import site.linkverse.back.repository.CommentRepository;
 import site.linkverse.back.repository.LikeRepository;
@@ -23,6 +24,7 @@ public class LikeService {
     private final PostRepository postRepository;
     private final CommentRepository commentRepository;
     private final UserRepository userRepository;
+    private final SSENotificationService sseNotificationService;
     
     public Mono<LikeDto> toggleLike(Long userId, Long targetId, LikeTargetType targetType) {
         return likeRepository.findByUserIdAndTargetIdAndTargetType(userId, targetId, targetType)
@@ -35,7 +37,26 @@ public class LikeService {
                             if (post.isDeleted()) {
                                 return Mono.error(new RuntimeException("삭제된 게시물에는 좋아요를 할 수 없습니다"));
                             }
-                            return createLike(userId, targetId, targetType);
+                            return createLike(userId, targetId, targetType).flatMap(created -> {
+                                if (created) {
+                                    if (!post.getUserId().equals(userId)) {
+                                        return userRepository.findById(userId)
+                                                .flatMap(liker -> sseNotificationService.createAndSendNotification(
+                                                        post.getUserId(),
+                                                        userId,
+                                                        NotificationType.LIKE,
+                                                        targetId,
+                                                        liker.getUsername() + "님이 회원님의 게시물을 좋아합니다"
+                                                ))
+                                                .thenReturn(true)
+                                                .onErrorResume(error -> {
+                                                    // 알림 전송 실패해도 좋아요는 유지
+                                                    return Mono.just(true);
+                                                });
+                                    }
+                                }
+                                return Mono.just(created);
+                            });
                         });
                 } else {
                     return commentRepository.findById(targetId)
@@ -44,7 +65,25 @@ public class LikeService {
                             if (comment.isDeleted()) {
                                 return Mono.error(new RuntimeException("삭제된 댓글에는 좋아요를 할 수 없습니다"));
                             }
-                            return createLike(userId, targetId, targetType);
+                            return createLike(userId, targetId, targetType).flatMap(created -> {
+                                if (created) {
+                                    if (!comment.getUserId().equals(userId)) {
+                                        return userRepository.findById(userId)
+                                                .flatMap(liker -> sseNotificationService.createAndSendNotification(
+                                                        comment.getUserId(),
+                                                        userId,
+                                                        NotificationType.LIKE,
+                                                        targetId,
+                                                        liker.getUsername() + "님이 회원님의 댓글을 좋아합니다"
+                                                ))
+                                                .thenReturn(true)
+                                                .onErrorResume(error -> {
+                                                    return Mono.just(true);
+                                                });
+                                    }
+                                }
+                                return Mono.just(created);
+                            });
                         });
                 }
             }))

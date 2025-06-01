@@ -175,7 +175,7 @@ public class DMWebSocketHandler implements WebSocketHandler {
 
             messageService.markAsRead(java.util.Collections.singletonList(messageId))
                     .subscribe(
-                            abc -> {
+                            success -> {
                                 MessageDto messageDto = wsMessage.getMessage();
 
                                 if (messageDto.getSenderId() != null && !messageDto.getSenderId().equals(userId)) {

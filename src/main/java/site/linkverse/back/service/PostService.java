@@ -9,6 +9,7 @@ import reactor.core.publisher.Mono;
 import site.linkverse.back.dto.*;
 import site.linkverse.back.enums.LikeTargetType;
 import site.linkverse.back.enums.MediaType;
+import site.linkverse.back.enums.VisibilityType;
 import site.linkverse.back.model.Hashtag;
 import site.linkverse.back.model.Media;
 import site.linkverse.back.model.Post;
@@ -89,11 +90,19 @@ public class PostService {
             .switchIfEmpty(Mono.error(new RuntimeException("게시물이 삭제되었습니다")))
             .flatMap(post -> enrichPostWithDetails(post, currentUserId));
     }
-    
+
     public Flux<PostDto> getFeedPosts(Long userId, int page, int size) {
+        // 모든 공개 게시글을 최신순으로 조회
+        return postRepository.findAllByVisibilityAndIsDeletedOrderByCreatedAtDesc(
+                        VisibilityType.PUBLIC, false, PageRequest.of(page, size))
+                .flatMap(post -> enrichPostWithDetails(post, userId));
+    }
+
+    // 팔로잉 사용자들의 게시글을 위한 새로운 메서드 추가
+    public Flux<PostDto> getFollowingFeedPosts(Long userId, int page, int size) {
         return postRepository.findFeedPosts(userId, PageRequest.of(page, size))
-            .filter(post -> !post.isDeleted())
-            .flatMap(post -> enrichPostWithDetails(post, userId));
+                .filter(post -> !post.isDeleted())
+                .flatMap(post -> enrichPostWithDetails(post, userId));
     }
     
     public Flux<PostDto> getUserPosts(Long userId, Long currentUserId, int page, int size) {

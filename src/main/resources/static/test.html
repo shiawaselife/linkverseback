@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>LinkVerse API 테스트</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        button { margin: 5px; padding: 10px; }
+        #notifications { background: #f5f5f5; padding: 10px; height: 200px; overflow-y: auto; }
+        .notification { margin: 5px 0; padding: 5px; background: white; border-left: 3px solid #007bff; }
+    </style>
+</head>
+<body>
+<h1>LinkVerse API 테스트</h1>
+
+<!-- 인증 섹션 -->
+<div class="section">
+    <h3>1. 사용자 인증</h3>
+    <input type="email" id="email" placeholder="이메일" value="test@example.com">
+    <input type="password" id="password" placeholder="비밀번호" value="password123">
+    <br>
+    <button onclick="register()">회원가입</button>
+    <button onclick="login()">로그인</button>
+    <button onclick="logout()">로그아웃</button>
+    <div id="authStatus"></div>
+</div>
+
+<!-- 게시물 섹션 -->
+<div class="section">
+    <h3>2. 게시물 기능</h3>
+    <textarea id="postContent" placeholder="게시물 내용을 입력하세요..."></textarea>
+    <br>
+    <button onclick="createPost()">게시물 작성</button>
+    <button onclick="getFeed()">피드 조회</button>
+    <div id="posts"></div>
+</div>
+
+<!-- 실시간 알림 섹션 -->
+<div class="section">
+    <h3>3. 실시간 알림 (SSE)</h3>
+    <button onclick="connectSSE()">알림 연결</button>
+    <button onclick="disconnectSSE()">알림 끊기</button>
+    <div id="sseStatus"></div>
+    <div id="notifications"></div>
+</div>
+
+<!-- 좋아요/댓글 테스트 -->
+<div class="section">
+    <h3>4. 상호작용 테스트</h3>
+    <input type="number" id="targetPostId" placeholder="게시물 ID">
+    <button onclick="toggleLike()">좋아요 토글</button>
+    <br>
+    <input type="text" id="commentContent" placeholder="댓글 내용">
+    <button onclick="addComment()">댓글 작성</button>
+    <div id="interactions"></div>
+</div>
+
+<script>
+    let authToken = localStorage.getItem('authToken');
+    let eventSource = null;
+
+    // 인증 상태 업데이트
+    function updateAuthStatus() {
+        const status = document.getElementById('authStatus');
+        status.innerHTML = authToken ?
+            '✅ 로그인됨 (토큰: ' + authToken + ')' :
+            '❌ 로그인 필요';
+    }
+
+    // 회원가입
+    async function register() {
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+
+        try {
+            const response = await fetch('/api/auth/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: email,
+                    password: password,
+                    username: email.split('@')[0]
+                })
+            });
+
+            const result = await response.json();
+            alert(result.success ? '회원가입 성공!' : '회원가입 실패: ' + result.message);
+        } catch (error) {
+            alert('오류: ' + error.message);
+        }
+    }
+
+    // 로그인
+    async function login() {
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+
+        try {
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                authToken = result.data.token;
+                localStorage.setItem('authToken', authToken);
+                alert('로그인 성공!');
+                updateAuthStatus();
+            } else {
+                alert('로그인 실패: ' + result.message);
+            }
+        } catch (error) {
+            alert('오류: ' + error.message);
+        }
+    }
+
+    // 로그아웃
+    function logout() {
+        authToken = null;
+        localStorage.removeItem('authToken');
+        disconnectSSE();
+        updateAuthStatus();
+        alert('로그아웃됨');
+    }
+
+    // 게시물 작성
+    async function createPost() {
+        if (!authToken) {
+            alert('로그인이 필요합니다');
+            return;
+        }
+
+        const content = document.getElementById('postContent').value;
+        if (!content) {
+            alert('게시물 내용을 입력하세요');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/posts', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + authToken
+                },
+                body: JSON.stringify({
+                    content: content,
+                    visibility: 'PUBLIC'
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                alert('게시물 작성 성공!');
+                document.getElementById('postContent').value = '';
+                getFeed(); // 피드 새로고침
+            } else {
+                alert('게시물 작성 실패: ' + result.message);
+            }
+        } catch (error) {
+            alert('오류: ' + error.message);
+        }
+    }
+
+    // 피드 조회
+    async function getFeed() {
+        if (!authToken) {
+            alert('로그인이 필요합니다');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/feed', {
+                headers: { 'Authorization': 'Bearer ' + authToken }
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                const postsDiv = document.getElementById('posts');
+                postsDiv.innerHTML = '<h4>최근 게시물들:</h4>';
+
+                result.data.forEach(post => {
+                    postsDiv.innerHTML += `
+                            <div style="border: 1px solid #ddd; margin: 10px 0; padding: 10px;">
+                                <strong>ID: ${post.id}</strong> - ${post.user.username}<br>
+                                ${post.content}<br>
+                                <small>❤️ ${post.likesCount} | 💬 ${post.commentsCount}</small>
+                            </div>
+                        `;
+                });
+            }
+        } catch (error) {
+            alert('오류: ' + error.message);
+        }
+    }
+
+    // SSE 연결
+    function connectSSE() {
+        console.log('=== connectSSE 함수 호출됨 ===');
+
+        if (!authToken) {
+            console.log('토큰 없음');
+            alert('로그인이 필요합니다');
+            return;
+        }
+
+        console.log('토큰 있음:', authToken);
+
+        if (eventSource) {
+            console.log('이미 연결됨');
+            alert('이미 연결되어 있습니다');
+            return;
+        }
+
+        console.log('EventSource 생성 시도...');
+        eventSource = new EventSource('/api/notifications/stream?token=' + authToken);
+        console.log('EventSource 생성됨:', eventSource);
+
+        eventSource.onmessage = function(event) {
+            console.log('일반 메시지 받음:', event.data);
+            // UI에도 표시
+            document.getElementById('notifications').innerHTML +=
+                '<div class="notification">메시지: ' + event.data + '</div>';
+        };
+
+        eventSource.onopen = function() {
+            document.getElementById('sseStatus').innerHTML = '🟢 SSE 연결됨';
+        };
+
+        eventSource.addEventListener('notification', function(event) {
+            console.log('=== 알림 받음 ===');
+            console.log('원본 데이터:', event.data);
+
+            try {
+                const notification = JSON.parse(event.data);
+                console.log('파싱된 데이터:', notification);
+                addNotificationToUI(notification);
+            } catch (error) {
+                console.error('JSON 파싱 에러:', error);
+                console.error('문제 데이터:', event.data);
+            }
+        });
+
+        eventSource.addEventListener('heartbeat', function(event) {
+            console.log('Heartbeat:', event.data);
+        });
+
+        eventSource.onerror = function(event) {
+            document.getElementById('sseStatus').innerHTML = '🔴 SSE 연결 오류';
+            console.error('SSE Error:', event);
+        };
+    }
+
+    // SSE 연결 해제
+    function disconnectSSE() {
+        if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+            document.getElementById('sseStatus').innerHTML = '⚫ SSE 연결 끊김';
+        }
+    }
+
+    // 알림을 UI에 추가
+    function addNotificationToUI(notification) {
+        const notificationsDiv = document.getElementById('notifications');
+        const notificationEl = document.createElement('div');
+        notificationEl.className = 'notification';
+        notificationEl.innerHTML = `
+                <strong>${notification.type}</strong>: ${notification.content}<br>
+                <small>${new Date(notification.createdAt).toLocaleString()}</small>
+            `;
+        notificationsDiv.insertBefore(notificationEl, notificationsDiv.firstChild);
+    }
+
+    // 좋아요 토글
+    async function toggleLike() {
+        if (!authToken) {
+            alert('로그인이 필요합니다');
+            return;
+        }
+
+        const postId = document.getElementById('targetPostId').value;
+        if (!postId) {
+            alert('게시물 ID를 입력하세요');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/likes/POST/${postId}`, {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + authToken }
+            });
+
+            const result = await response.json();
+            document.getElementById('interactions').innerHTML =
+                result.success ? '✅ 좋아요 처리됨' : '❌ 실패: ' + result.message;
+        } catch (error) {
+            alert('오류: ' + error.message);
+        }
+    }
+
+    // 댓글 작성
+    async function addComment() {
+        if (!authToken) {
+            alert('로그인이 필요합니다');
+            return;
+        }
+
+        const postId = document.getElementById('targetPostId').value;
+        const content = document.getElementById('commentContent').value;
+
+        if (!postId || !content) {
+            alert('게시물 ID와 댓글 내용을 입력하세요');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/comments', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + authToken
+                },
+                body: JSON.stringify({
+                    postId: parseInt(postId),
+                    content: content
+                })
+            });
+
+            const result = await response.json();
+            document.getElementById('interactions').innerHTML =
+                result.success ? '✅ 댓글 작성됨' : '❌ 실패: ' + result.message;
+
+            if (result.success) {
+                document.getElementById('commentContent').value = '';
+            }
+        } catch (error) {
+            alert('오류: ' + error.message);
+        }
+    }
+
+    // 페이지 로드 시 초기화
+    window.onload = function() {
+        authToken = localStorage.getItem('authToken');
+        updateAuthStatus();
+    };
+</script>
+</body>
+</html>

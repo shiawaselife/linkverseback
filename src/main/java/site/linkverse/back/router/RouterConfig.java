@@ -4,6 +4,7 @@ import site.linkverse.back.handler.*;
 import site.linkverse.back.config.AuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.RouterFunctions;
@@ -27,7 +28,19 @@ public class RouterConfig {
             SearchHandler searchHandler,
             SecurityHandler securityHandler,
             MediaHandler mediaHandler,
+            SSEHandler sseHandler,
             AuthenticationFilter authFilter) {
+
+        // 정적 파일 라우트 (인증 불필요)
+        RouterFunction<ServerResponse> staticRoutes = RouterFunctions
+                .route(GET("/test.html"), request ->
+                        ServerResponse.ok()
+                                .contentType(MediaType.TEXT_HTML)
+                                .bodyValue(new ClassPathResource("static/test.html")))
+                .andRoute(GET("/"), request ->
+                        ServerResponse.ok()
+                                .contentType(MediaType.TEXT_HTML)
+                                .bodyValue(new ClassPathResource("static/test.html")));
 
         // 인증이 필요 없는 공개 라우트
         RouterFunction<ServerResponse> publicRoutes = RouterFunctions
@@ -48,7 +61,8 @@ public class RouterConfig {
                 .andRoute(PUT("/api/users/{id}/password").and(accept(MediaType.APPLICATION_JSON)), userHandler::updatePassword)
                 .andRoute(POST("/api/posts").and(accept(MediaType.APPLICATION_JSON)), postHandler::createPost)
                 .andRoute(GET("/api/posts/{id}").and(accept(MediaType.APPLICATION_JSON)), postHandler::getPost)
-                .andRoute(GET("/api/feed").and(accept(MediaType.APPLICATION_JSON)), postHandler::getFeedPosts)
+                .andRoute(GET("/api/feed").and(accept(MediaType.APPLICATION_JSON)), postHandler::getFeedPosts) // 전체 공개 게시글
+                .andRoute(GET("/api/feed/following").and(accept(MediaType.APPLICATION_JSON)), postHandler::getFollowingFeedPosts) // 팔로잉 피드
                 .andRoute(GET("/api/users/{userId}/posts").and(accept(MediaType.APPLICATION_JSON)), postHandler::getUserPosts)
                 .andRoute(GET("/api/hashtags/{hashtag}/posts").and(accept(MediaType.APPLICATION_JSON)), postHandler::getHashtagPosts)
                 .andRoute(PUT("/api/posts/{id}").and(accept(MediaType.APPLICATION_JSON)), postHandler::updatePost)
@@ -77,15 +91,17 @@ public class RouterConfig {
                 .andRoute(GET("/api/security/blocked").and(accept(MediaType.APPLICATION_JSON)), securityHandler::getBlockedUsers)
                 .andRoute(POST("/api/security/report").and(accept(MediaType.APPLICATION_JSON)), securityHandler::reportContent)
                 .andRoute(GET("/api/messages/online-users").and(accept(MediaType.APPLICATION_JSON)), messageHandler::getOnlineUsers)
-                .andRoute(GET("/api/messages/users/{userId}/online-status").and(accept(MediaType.APPLICATION_JSON)), messageHandler::checkUserOnlineStatus);
-
+                .andRoute(GET("/api/messages/users/{userId}/online-status").and(accept(MediaType.APPLICATION_JSON)), messageHandler::checkUserOnlineStatus)
+                .andRoute(GET("/api/notifications/stream"), sseHandler::streamNotifications);
 
         RouterFunction<ServerResponse> mediaRoutes = RouterFunctions
                 .route(POST("/api/media/upload"), mediaHandler::uploadFile)
-                .andRoute(GET("/api/media/" +
-                        "{filename}"), mediaHandler::downloadFile);
+                .andRoute(GET("/api/media/{filename}"), mediaHandler::downloadFile);
 
-        // 보호된 라우트에 인증 필터를 적용하고 공개 라우트와 결합
-        return publicRoutes.and(protectedRoutes.filter(authFilter)).and(mediaRoutes);
+        // 모든 라우트 결합: 정적 파일 + 공개 라우트 + 보호된 라우트 + 미디어 라우트
+        return staticRoutes
+                .and(publicRoutes)
+                .and(protectedRoutes.filter(authFilter))
+                .and(mediaRoutes);
     }
 }

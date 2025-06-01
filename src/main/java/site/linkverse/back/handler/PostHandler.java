@@ -57,22 +57,39 @@ public class PostHandler {
                     .build()
             ));
     }
-    
+
     public Mono<ServerResponse> getFeedPosts(ServerRequest request) {
         Long userId = (Long) request.attributes().get("userId");
         int page = Integer.parseInt(request.queryParam("page").orElse("0"));
         int size = Integer.parseInt(request.queryParam("size").orElse("20"));
-        
+
         return postService.getFeedPosts(userId, page, size)
-            .collectList()
-            .flatMap(posts -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).bodyValue(
-                ApiResponse.<List<PostDto>>builder()
-                    .success(true)
-                    .data(posts)
-                    .page(page)
-                    .size(size)
-                    .build()
-            ));
+                .collectList()
+                .flatMap(posts -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).bodyValue(
+                        ApiResponse.<List<PostDto>>builder()
+                                .success(true)
+                                .data(posts)
+                                .page(page)
+                                .size(size)
+                                .build()
+                ));
+    }
+
+    public Mono<ServerResponse> getFollowingFeedPosts(ServerRequest request) {
+        Long userId = (Long) request.attributes().get("userId");
+        int page = Integer.parseInt(request.queryParam("page").orElse("0"));
+        int size = Integer.parseInt(request.queryParam("size").orElse("20"));
+
+        return postService.getFollowingFeedPosts(userId, page, size)
+                .collectList()
+                .flatMap(posts -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).bodyValue(
+                        ApiResponse.<List<PostDto>>builder()
+                                .success(true)
+                                .data(posts)
+                                .page(page)
+                                .size(size)
+                                .build()
+                ));
     }
     
     public Mono<ServerResponse> getUserPosts(ServerRequest request) {
