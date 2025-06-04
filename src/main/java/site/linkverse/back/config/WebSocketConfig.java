@@ -3,6 +3,7 @@ package site.linkverse.back.config;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.reactive.HandlerMapping;
 import org.springframework.web.reactive.handler.SimpleUrlHandlerMapping;
 import org.springframework.web.reactive.socket.WebSocketHandler;
@@ -22,10 +23,22 @@ public class WebSocketConfig {
     public HandlerMapping webSocketHandlerMapping() {
         Map<String, WebSocketHandler> map = new HashMap<>();
         map.put("/ws/dm", dmWebSocketHandler);
-        
+
         SimpleUrlHandlerMapping handlerMapping = new SimpleUrlHandlerMapping();
-        handlerMapping.setOrder(1);
+        handlerMapping.setOrder(-1); // 높은 우선순위 설정
         handlerMapping.setUrlMap(map);
+
+        // CORS 설정 추가
+        CorsConfiguration corsConfiguration = new CorsConfiguration();
+        corsConfiguration.setAllowCredentials(true);
+        corsConfiguration.addAllowedOriginPattern("*");
+        corsConfiguration.addAllowedHeader("*");
+        corsConfiguration.addAllowedMethod("*");
+
+        Map<String, CorsConfiguration> corsConfigurationMap = new HashMap<>();
+        corsConfigurationMap.put("/ws/**", corsConfiguration);
+        handlerMapping.setCorsConfigurations(corsConfigurationMap);
+
         return handlerMapping;
     }
 

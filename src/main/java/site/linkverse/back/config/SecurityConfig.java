@@ -13,9 +13,11 @@ public class SecurityConfig {
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
         return http
-                .csrf(csrf -> csrf.disable())  // For development only - in production you might want to configure this properly
+                .csrf(csrf -> csrf.disable())
                 .authorizeExchange(exchanges -> exchanges
                         .pathMatchers("/api/auth/register", "/api/auth/login").permitAll()
+                        .pathMatchers("/ws/**").permitAll() // WebSocket 경로 허용
+                        .pathMatchers("/test.html", "/", "/static/**").permitAll() // 정적 리소스 허용
                         .anyExchange().permitAll()
                 )
                 .build();

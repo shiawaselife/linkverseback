@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>WebSocket Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .message-box { border: 1px solid #ccc; height: 300px; overflow-y: auto; padding: 10px; margin: 10px 0; }
+        .input-group { margin: 10px 0; }
+        input, button { padding: 8px; margin: 5px; }
+        .error { color: red; }
+        .success { color: green; }
+        .info { color: blue; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>WebSocket 연결 테스트</h1>
+
+    <div class="input-group">
+        <label>JWT 토큰:</label>
+        <input type="text" id="token" placeholder="JWT 토큰을 입력하세요" style="width: 400px;">
+    </div>
+
+    <div class="input-group">
+        <button onclick="connect()">연결</button>
+        <button onclick="disconnect()">연결 해제</button>
+        <span id="status">연결되지 않음</span>
+    </div>
+
+    <div class="message-box" id="messages"></div>
+
+    <div class="input-group">
+        <input type="number" id="receiverId" placeholder="수신자 ID">
+        <input type="text" id="messageContent" placeholder="메시지 내용">
+        <button onclick="sendMessage()">메시지 전송</button>
+    </div>
+</div>
+
+<script>
+    let ws = null;
+
+    function addMessage(message, className = '') {
+        const messagesDiv = document.getElementById('messages');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = className;
+        messageDiv.textContent = new Date().toLocaleTimeString() + ': ' + message;
+        messagesDiv.appendChild(messageDiv);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    function connect() {
+        const token = document.getElementById('token').value;
+        if (!token) {
+            addMessage('토큰을 입력해주세요', 'error');
+            return;
+        }
+
+        const wsUrl = `ws://localhost:8080/ws/dm?token=${encodeURIComponent(token)}`;
+        addMessage(`연결 시도: ${wsUrl}`, 'info');
+
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = function(event) {
+            addMessage('WebSocket 연결 성공!', 'success');
+            document.getElementById('status').textContent = '연결됨';
+            document.getElementById('status').style.color = 'green';
+        };
+
+        ws.onmessage = function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                addMessage(`수신: ${JSON.stringify(data, null, 2)}`, 'info');
+            } catch (e) {
+                addMessage(`수신 (텍스트): ${event.data}`, 'info');
+            }
+        };
+
+        ws.onclose = function(event) {
+            addMessage(`WebSocket 연결 종료: 코드=${event.code}, 이유=${event.reason}`, 'error');
+            document.getElementById('status').textContent = '연결 해제됨';
+            document.getElementById('status').style.color = 'red';
+        };
+
+        ws.onerror = function(error) {
+            addMessage(`WebSocket 오류: ${error}`, 'error');
+        };
+    }
+
+    function disconnect() {
+        if (ws) {
+            ws.close();
+            ws = null;
+        }
+    }
+
+    function sendMessage() {
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            addMessage('WebSocket이 연결되지 않았습니다', 'error');
+            return;
+        }
+
+        const receiverId = document.getElementById('receiverId').value;
+        const content = document.getElementById('messageContent').value;
+
+        if (!receiverId || !content) {
+            addMessage('수신자 ID와 메시지 내용을 모두 입력해주세요', 'error');
+            return;
+        }
+
+        const message = {
+            type: 'SEND_MESSAGE',
+            message: {
+                receiverId: parseInt(receiverId),
+                content: content
+            },
+            timestamp: new Date().toISOString()
+        };
+
+        ws.send(JSON.stringify(message));
+        addMessage(`전송: ${JSON.stringify(message, null, 2)}`, 'success');
+
+        // 입력 필드 초기화
+        document.getElementById('messageContent').value = '';
+    }
+
+    // 엔터 키로 메시지 전송
+    document.getElementById('messageContent').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            sendMessage();
+        }
+    });
+</script>
+</body>
+</html>
